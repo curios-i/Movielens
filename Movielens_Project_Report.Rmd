@@ -1,0 +1,245 @@
+---
+title: "Movielens Project Report"
+author: "Curios_i"
+date: "31/01/2021"
+output: pdf_document
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Introduction
+Though recommender systems are not new, the interest in a movie rating recommender system was fueled by Netflix challenge announced in 2006 and finally won by BellKor's Pragmatic Chaos team in 2009. The goal of this project is to create a movie recommendation system using the movielens dataset. The movielens dataset comprises of 10M movie ratings from Netfflix data as compared to more than 100M used in Netflix challenge. 
+To build a recommender system, this report will discuss two solutions. Please note that this is a learning project and not a research project. Although the Solution#2 is more efficient and robust, it is kind of plug and play, that's why Solution#1 is also included which dissects about the main underlying theory of a recommender system. In the end, we shall compare both solutions and their limitations. Though both soutions have achieved the target RMSE, we shall still emphasize that the intent of this project and report is learning and sharing, not winning any competition. So, engjoy...
+
+The project report is divided into following sections:
+
+* Data Analysis : to analyze the Movielens data and the nature of the rating prediectio problem.
+* Method : to discuss the method employed to construct a recommendation system based on the data analysis
+* Results: to present modelling results and discuss the model performance.
+* Conclusion: to give brief summary of the report, its limitations and future work.
+
+# Data Analysis
+## Grabbing the data
+The 10M movie rating data is downloaded from [this link](http://files.grouplens.org/datasets/movielens/ml-10m.zip). Here is the code to convert this data into a data frame and then divide into a edx and validation data set. 
+```{r grabbing-data,cache=TRUE,results='hide',warning=FALSE,message=FALSE}
+
+if(!require(tidyverse)) install.packages("tidyverse")
+if(!require(caret)) install.packages("caret")
+if(!require(data.table)) install.packages("data.table")
+if(!require(data.table)) install.packages("Matrix")
+if(!require(data.table)) install.packages("recommenderlab")
+
+#tcrossprod() is used from library Matrix, while 
+#funkSVD() is used from library recommenderlab
+
+library(tidyverse)
+library(caret)
+library(data.table)
+library(Matrix)
+library(recommenderlab)
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- fread(text = gsub("::", "\t",readLines(unzip(dl,"ml-10M100K/ratings.dat"))),
+col.names = c("userId", "movieId", "rating", "timestamp"))
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(movieId),
+title = as.character(title), genres = as.character(genres))
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+set.seed(1, sample.kind="Rounding") # if using R 3.5 or earlier, use `set.seed(1)`
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+validation <- temp %>% 
+  semi_join(edx, by = "movieId") %>%
+  semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+
+```
+
+Next, we divide edx data frame into edx_train and edx_test using the following code so that we can tune and test our module without touching the validation data frame. But, before doing that, we increase the virtual memory to 200,000MB so that it can handle this huge amount of data.
+```{r train-test,cache=TRUE,results='hide',warning=FALSE,message=FALSE}
+memory.limit(size=200000) #sets virtual memory size to 200,000Mb to process large data
+set.seed(1, sample.kind="Rounding")
+#Partition edx into 80% edx_train and 20% edx_test so 
+#that we can tune the model without touching the validation data
+test_index <- createDataPartition(y = edx$rating, times = 1, p = 0.2, list = FALSE)
+edx_train<-edx[-test_index,]
+temp<-edx[test_index,]
+
+#make sure that the movieId and userId in edx_train are also in edx_test
+edx_test<-temp%>%semi_join(edx_train,by="movieId")%>%semi_join(edx_train,by="userId")
+#Add removed records from edx_test back to edx_train
+removed<-anti_join(temp,edx_test)
+edx_train<-rbind(edx_train,removed)
+#Remove temporary variables to free up the memorylib
+rm(removed,temp,test_index)
+```
+## Analyzing the Data and Deciding the Model
+The next step is to analye the data and decide which model to use. However, before doing that, we need to decide our loss function. We shall use root-mean-squre-error as our loss function. So, let's define our loss function in the following code:
+```{r RMSE,cache=TRUE,results='hide',warning=FALSE,message=FALSE}
+RMSE <- function(true_ratings, predicted_ratings){
+  sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+```
+There are two main challenges with data in this project
+
+* The size of data
+* The nature of the model
+
+The first temptation is to use a machine learning model on this data, like linear regression, logistic regression, LDA, QDA etc. The problem with this approach is that userId and movieId are just arbitrary variables. In fact, userId was used by Netflix to protect the privac of users. There is no cause and effect relationship between userId vs rating or movieId vs rating. In fact, if I take userId from 1 to 1000 and 1001 to 2000 and swap them, it should not affect the prediction model at all. To prove this point, let's see the correlation.
+```{r correlation,warning=FALSE,message=FALSE }
+cor(edx$userId,edx$rating)
+cor(edx$movieId,edx$rating)
+```
+Another issue is the size of the data. For such a large dataset if you try to use any model using normal r package (e.g. caret), it will crash your computer, or you need a very large computing resource, which is out of reach of most of the students. One solution to this problem is to use stochastic gradient descent algorithm, which we shall discuss later in this report.
+In fact, we created a liner regression model of this dataset using "SGD" package, but the RMSE obtained was greater than 1.5, for the reasons explained above, so we are not even including that in this report.
+Now, to have a visual sense of dataset, let's first dissect the edx_train into a smaller dataset and then make a 3D plot.
+```{r plot3D,cache=TRUE,warning=FALSE,message=FALSE}
+train_small<-edx_train%>%filter(userId<10000)
+if(!require(scatterplot3d)) install.packages("scatterplot3d")
+library(scatterplot3d)
+scatterplot3d(x=train_small$userId,z=train_small$rating,y=train_small$movieId,
+color = train_small$rating,xlab="userId",ylab="movieId",zlab="Rating",pch=16)
+
+```
+```{r remove-train_small, echo=FALSE,results='hide',warning=FALSE,message=FALSE}
+rm(train_small)
+```
+It is clear from the plot that applying a normal machine learning technique as described above will not be very successful on this data.
+## Recommender System Modeling Techniques
+Following chart shows well known recommender system modeling techniques.
+
+```{r chart,out.width="80%",dpi=600,echo=FALSE,warning=FALSE,message=FALSE }
+library(knitr)
+include_graphics("./Images/Recommendation_tech.JPG")
+```
+
+### Conent Based Filtering
+Content based technique emphasizes more on the analysis of the attributes of items in order to generate predictions. When items, like web pages, publications and news are to be recommended, content-based filtering technique is the most successful. Content based filtering requires a lot of meta data about items. Since in the case of movielens data the only meta data somewhat useful is the movie genera, we are not considering content-based filtering in this project.
+
+[3] chapter 3 discusses an example of movie reviews either positive or negative based on 50,000 reviews from IMDB data set using deep learning. The same model can be extended to predict movie ratings from 1-5 based on reviews. As mentioned above, we don't have enough data to apply this filtering in this project.
+
+### Collborative Filtering
+Collaborative filtering is a prediction technique for content that cannot easily adn adequately be described by metadata, such as movies and music. Collaborative filtering technique works by building a database
+(user-item matrix) of preferences for items by users. It thenmmatches users with relevant interest and preferences by calculating similarities between their profiles to make recommendations. Such users build a group called neighborhood. An user gets recommendations to those items that he has not rated before but that were already positively rated by users in his neighborhood. The technique of collaborative filtering can be divided into two categories:memory-based and model-based.
+
+#### Memory Based Collaborative Filtering
+Memory-based CF can be achieved in two ways through user-based and item-based techniques. User based collaborative filtering technique calculates similarity between users by comparing their ratings on the same item and it then computes the predicted rating for an item by the active user as a weighted average of the ratings of the item by users similar to the active user where weights are the similarities of these users with the target item. Item-based filtering techniques compute predictions using the similarity between items and not the similarity between users.
+
+In our Solution#1 we have used memory based collaborating filtering along with regularization on top of overall average rating.
+
+#### Model Based Techniques
+Model based techniqes employ previous ratings to learn a model in order to improve the performance of collaborative filtering. These techniques can quickly recommmend a set of items for the fact that they use pre-computed model. The most popular model based techniqe in recommender system is Singular Value Decomposition (SVD). In both our Solution#1 and Solution#2 matrix factorization by SVD is used as a model based CF filtering.
+
+# Solution#1
+
+Solution#1 is based on [1] and [2]. The model for predicted ratings have four components, calculated from edx_train
+
+*1. mu - mean of ratings
+
+*2. b_i - average rating of a movie i, with L2 regularization
+
+*3. b_u - average rating given by a user I, with L2 regularization
+
+*4. pred - residual ratings calculated from above and then from matrix factorization
+
+The first step is to calculate the first component, i.e. mu - mean of ratings
+```{r mu, cache=TRUE,warning=FALSE,message=FALSE }
+mu<-mean(edx_train$rating)
+```
+Next step is to calculate values of b_i and b_u using L2 regularization. We shall use equations given in [1] and [2]
+
+$b_i(\lambda)= \frac{1}{\lambda + n_i}\sum_{a=1}^{n_i}(Y_{a}-\mu)$ 
+
+$b_u(\lambda)= \frac{1}{\lambda + n_u}\sum_{a=1}^{n_u}(Y_{a}-\mu-b_i)$ 
+
+Since b_i and b_u are function of $\lambda$, we first define an range of lambdas and then find rmses for every value in the lambdas vector.
+```{r cache=TRUE, warning=FALSE,message=FALSE }
+lambdas <- seq(3, 7, 0.25)
+# calculates rmses for the above values of lambdas to tune the model
+rmses<-sapply(lambdas,function(l){
+  b_i<-edx_train%>%group_by(movieId)%>%summarise(b_i=sum(rating-mu)/(n()+l))
+  b_u<-edx_train%>%left_join(b_i,by="movieId")%>%
+    group_by(userId)%>%
+    summarise(b_u=sum(rating-b_i-mu)/(n()+l))
+  predicted_ratings_test<-edx_test%>%left_join(b_i,by="movieId")%>%
+    left_join(b_u,by="userId")%>%
+    mutate(pred=mu+b_i+b_u)%>%
+    pull(pred)
+  return(RMSE(predicted_ratings_test,edx_test$rating))})
+```
+Now, plot of rmses vs lambdas
+```{r plot,cache=TRUE, warning=FALSE,message=FALSE ,fig.height=3,fig.width=5}
+library(ggplot2)
+qplot(lambdas,rmses)
+```
+We find the the minimum rmse at this point is
+```{r cache=TRUE, warning=FALSE,message=FALSE } 
+min(rmses)
+```
+at the value of lambda
+```{r cache=TRUE, warning=FALSE,message=FALSE}
+lambda<-lambdas[which.min(rmses)]
+lambda
+```
+Now we shall calculate b_i and b_u for edx_train. Those b_i and b_u are then used to calculate predicted ratings for edx_train and edx_test. Predicted ratings for edx_test is later used along with funk svd predictions to tune the model.
+
+Predcited ratings for edx_train are used to calculate the residual ratings. Funk svd matrix factorization is applied on those residual edx_train ratings to build the model. 
+
+Here is the code:
+
+```{r cache=TRUE, warning=FALSE,message=FALSE}
+# calculates b_i and b_u for edx_train. Since all users and movies in edx_test and 
+#validation are present in edx_train, these values of b_i and b_u are used later  to 
+#calculate the predicted ratings for those datasets
+b_i<-edx_train%>%group_by(movieId)%>%
+  summarise(b_i=sum(rating-mu)/(n()+lambda))
+b_u<-edx_train%>%left_join(b_i,by="movieId")%>%
+  group_by(userId)%>%
+  summarise(b_u=sum(rating-b_i-mu)/(n()+lambda))
+# calculates predicted ratings for the edx_test based on b_i and b_u
+predicted_ratings_test<-edx_test%>%
+  left_join(b_i,by="movieId")%>%
+  left_join(b_u,by="userId")%>%
+  mutate(pred=mu+b_i+b_u)%>%
+  pull(pred)
+#calculates predicted ratings for edx_train, so that we can calculate 
+#residuals for further matrix factorization
+predicted_ratings_train<-edx_train%>%
+  left_join(b_i,by="movieId")%>%
+  left_join(b_u,by="userId")%>%
+  mutate(pred=mu+b_i+b_u)%>%
+  pull(pred)
+#calculated residual ratings after subtracting the predicted ratings 
+#from edx_train ratings
+edx_train<-edx_train%>%
+  mutate(predicted_ratings_train=predicted_ratings_train,
+         resid=rating-predicted_ratings_train)
+```
+
+# Bibliography
+[1] Yehuda Koren. The BellKor Solution to the Netflix Grand Prize
+
+[2] Rafael A. Irizarry. Introduction to Data Science
+
+[3] François Chollet and Joseph J. Allaire. Deep Learning with R
