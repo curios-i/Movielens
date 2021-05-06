@@ -23,6 +23,8 @@ Though recommender systems are not new, the interest in a movie rating recommend
 
 To build a recommender system, this report will discuss two solutions. Please note that this is a learning project and not a research project. Although the Solution#2 is more efficient and robust, it is kind of plug and play, that's why Solution#1 is also included which dissects about the main underlying theory of a recommender system. In the end, we shall compare both solutions and their limitations. Though both solutions have achieved the target RMSE, we shall still emphasize that the intent of this project and report is learning and sharing, not winning any competition. So, sit back relax and enjoy...
 
+This report and the code is also available from [github repository](https://github.com/curios-i/Movielens.git).
+
 # Data Analysis
 ## Grabbing the data
 The 10M movie rating data is downloaded from [this link](http://files.grouplens.org/datasets/movielens/ml-10m.zip). Here is the code to convert this data into a data frame and then divide into a edx and validation data set. 
@@ -471,7 +473,7 @@ In the first step, we shall load the `recosystem package` and will initialize a 
 install.packages("recosystem")
 ```
 
-```{r warning=FALSE,message=FALSE, cache=TRUE,results='hide'}
+```{r warning=FALSE,message=FALSE, results='hide'}
 library(recosystem)
 r<-Reco()
 ```
@@ -480,7 +482,9 @@ r<-Reco()
 Next, we tune the model for 5 features or 10 features #with 3 different values of learning rates (0.05,0.1,0.15)
 for 20 iterations and 5 fold cross validation. Please note that since the tune function is itself using cross validation, we are not breaking edx dataset into train and test.
 ```{r eval=FALSE,message=FALSE,warning=FALSE}
-opts<-r$tune(data_memory(edx$userId,edx$movieId,rating = edx$rating,index1 = TRUE),opts = list(dim=c(5,10),lrate=c(0.05,0.1,0.15),niter=20,nfold=5,verbose=FALSE))
+opts<-r$tune(data_memory(edx$userId,edx$movieId,
+    rating = edx$rating,index1 = TRUE),
+    opts = list(dim=c(5,10),lrate=c(0.05,0.1,0.15),niter=20,nfold=5,verbose=FALSE))
 
 ```
 ```{r echo=FALSE,warning=FALSE,message=FALSE}
@@ -488,27 +492,29 @@ load("./rdas/opts.rda")
 ```
 
 Opts$min gives us the optimized tuning parameters.
-```{r cache=TRUE,warning=FALSE,message=FALSE}
+```{r warning=FALSE,message=FALSE}
 opts$min
 ```
 Tuning Parameter    |   Value
 --------------------|------------
-Features            |   opts$min$dim
-Learning rate       |   opts$min$lrate
+Features            |   `r format(opts$min$dim, scientific=FALSE)`
+Learning rate       |   `r format(opts$min$lrate, scientific=FALSE)`
 
 ## Model Trainig
 
 Following will train edx dataset based on above tuning parameters and 100 iterations.
 
-```{r cache=TRUE,message=FALSE,warning=FALSE}
-r$train(data_memory(edx$userId,edx$movieId,rating = edx$rating,index1 = TRUE),opts = c(opts$min,nthread=1,niter=100))
+```{r message=FALSE,warning=FALSE}
+r$train(data_memory(edx$userId,edx$movieId,rating = edx$rating,index1 = TRUE),
+        opts = c(opts$min,nthread=1,niter=100))
 ```
 
 ## Results
 
 Now we use the predict function to get predicted ratings for the validation set.
 ```{r cache=TRUE,message=FALSE,warning=FALSE}
-predicted_ratings<-r$predict(data_memory(validation$userId,validation$movieId,rating = NULL,index1 = TRUE),out_memory())
+predicted_ratings<-r$predict(data_memory(validation$userId,
+        validation$movieId,rating = NULL,index1 = TRUE),out_memory())
 ```
 Finally the RMSE function gives the root mean square error.
 ```{r cache=TRUE,message=FALSE,warning=FALSE}
@@ -521,11 +527,11 @@ The original Netflix competition was launched in 2006 and winners were announced
 
 The obvious answer comes into mind is Bellkor. Following is the trend of Netflix's revenue growth over the years.
 
-![Netflix Revenue Growth]("./Images/Netflix Revenue Growth.png ")
+![Netflix Revenue Growth]("./Images/Netflix Revenue Growth.png")
 
 This shows that the real beneficiary of all these kind of initiatives was actually Netflix itself. The $1M price over three years of hard work divided among 7 persons doesn't look like an attractive story, compared to the the benefits Netflix reaped out of it.
 
-The practical challenge for any such recommender system is that the competition was done on a static data, whereas the in the real world recommender system has to deal with data changing all the time, i.e. always new users adding up and new movies coming in. We couldn't find how Netflix is using recommender system on realtime data and at what frequency they are retraining their models, though we have some insight from LinkedIn offline batch computing and online serving. 
+The practical challenge for any such recommender system is that the competition was done on a static data, whereas the in the real world recommender system has to deal with data changing all the time, i.e. always new users adding up and new movies coming in. We couldn't find how Netflix is using recommender system on real time data and at what frequency they are retraining their models, though we have some insight from LinkedIn offline batch computing and online serving. 
 
 
 # Bibliography
