@@ -116,13 +116,13 @@ edx_train<-edx_train%>%mutate(predicted_ratings_train=predicted_ratings_train,re
 y<-edx_train%>%select(userId,movieId,resid)%>%spread(movieId,resid)%>%as.matrix()
 rownames(y)<- y[,1]
 y<-y[,-1]
-# gammas are L2 regularizatino terms in svd stochastic gradient descent algoritm
+# gammas are L1 regularization terms in svd gradient descent algoritm
 # we shall calculate rmses for each of these gammas and will determin which one gives optimal tuning
 gammas<-c(0.015,0.025,0.035)
 # f_rmses stores rmses calculated for respective values of gammas
 f_rmses<-c(1,1,1)
 ###############################################################################
-# runs the Simon Funk's stocastic gradient descent algorithm to factorize matrix of residuals
+# runs the Simon Funk's gradient descent algorithm to factorize matrix of residuals
 # this will take several hours
 fsvd<-funkSVD(y, k=3, gamma=gammas[1], lambda=0.001, verbose=TRUE)
 # y_hat is prediction matrix from SVD 
@@ -141,7 +141,7 @@ predicted_ratings_0.015<-predicted_ratings_test+pred
 f_rmses[1]<-RMSE(predicted_ratings_0.015,edx_test$rating)
 #[1] 0.8260231
 ###############################################################
-# runs the Simon Funk's stocastic gradient descent algorithm to factorize matrix of residuals
+# runs the Simon Funk's gradient descent algorithm to factorize matrix of residuals
 fsvd<-funkSVD(y, k=3, gamma=gammas[2], lambda=0.001, verbose=TRUE)
 # y_hat is prediction matrix from SVD 
 y_hat_0.025<-tcrossprod(fsvd$U,fsvd$V)

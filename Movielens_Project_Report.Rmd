@@ -1,28 +1,32 @@
 ---
-title: "Movielens Project Report"
+title: "Movielens_Project_Report"
 author: "Curios_i"
-date: "31/01/2021"
-output: pdf_document
+date: "04/05/2021"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+    highlight: tango
+    fig_caption: yes
+    fig_crop: no
 urlcolor: blue
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+\newpage
 # Introduction
-Though recommender systems are not new, the interest in a movie rating recommender system was fueled by Netflix challenge announced in 2006 and finally won by BellKor's Pragmatic Chaos team in 2009. The goal of this project is to create a movie recommendation system using the movielens dataset. The movielens dataset comprises of 10M movie ratings from Netfflix data as compared to more than 100M used in Netflix challenge. 
-To build a recommender system, this report will discuss two solutions. Please note that this is a learning project and not a research project. Although the Solution#2 is more efficient and robust, it is kind of plug and play, that's why Solution#1 is also included which dissects about the main underlying theory of a recommender system. In the end, we shall compare both solutions and their limitations. Though both soutions have achieved the target RMSE, we shall still emphasize that the intent of this project and report is learning and sharing, not winning any competition. So, engjoy...
+Though recommender systems are not new, the interest in a movie rating recommender system was fueled by Netflix challenge announced in 2006 and finally won by BellKor's Pragmatic Chaos team in 2009. The goal of this project is to create a movie recommendation system using the movielens dataset. The movielens dataset comprises of 10M movie ratings from Netflix data as compared to more than 100M used in Netflix challenge.
 
-The project report is divided into following sections:
-
-* Data Analysis : to analyze the Movielens data and the nature of the rating prediectio problem.
-* Method : to discuss the method employed to construct a recommendation system based on the data analysis
-* Results: to present modelling results and discuss the model performance.
-* Conclusion: to give brief summary of the report, its limitations and future work.
+To build a recommender system, this report will discuss two solutions. Please note that this is a learning project and not a research project. Although the Solution#2 is more efficient and robust, it is kind of plug and play, that's why Solution#1 is also included which dissects about the main underlying theory of a recommender system. In the end, we shall compare both solutions and their limitations. Though both solutions have achieved the target RMSE, we shall still emphasize that the intent of this project and report is learning and sharing, not winning any competition. So, sit back relax and enjoy...
 
 # Data Analysis
 ## Grabbing the data
 The 10M movie rating data is downloaded from [this link](http://files.grouplens.org/datasets/movielens/ml-10m.zip). Here is the code to convert this data into a data frame and then divide into a edx and validation data set. 
+
 ```{r grabbing-data,cache=TRUE,results='hide',warning=FALSE,message=FALSE}
 
 if(!require(tidyverse)) install.packages("tidyverse")
@@ -39,6 +43,7 @@ library(caret)
 library(data.table)
 library(Matrix)
 library(recommenderlab)
+library(knitr)
 
 # MovieLens 10M dataset:
 # https://grouplens.org/datasets/movielens/10m/
@@ -91,11 +96,11 @@ edx_test<-temp%>%semi_join(edx_train,by="movieId")%>%semi_join(edx_train,by="use
 #Add removed records from edx_test back to edx_train
 removed<-anti_join(temp,edx_test)
 edx_train<-rbind(edx_train,removed)
-#Remove temporary variables to free up the memorylib
+#Remove temporary variables to free up the memory
 rm(removed,temp,test_index)
 ```
 ## Analyzing the Data and Deciding the Model
-The next step is to analye the data and decide which model to use. However, before doing that, we need to decide our loss function. We shall use root-mean-squre-error as our loss function. So, let's define our loss function in the following code:
+The next step is to analyze the data and decide which model to use. However, before doing that, we need to decide our loss function. We shall use root-mean-square-error as our loss function. So, let's define our loss function in the following code:
 ```{r RMSE,cache=TRUE,results='hide',warning=FALSE,message=FALSE}
 RMSE <- function(true_ratings, predicted_ratings){
   sqrt(mean((true_ratings - predicted_ratings)^2))
@@ -106,7 +111,7 @@ There are two main challenges with data in this project
 * The size of data
 * The nature of the model
 
-The first temptation is to use a machine learning model on this data, like linear regression, logistic regression, LDA, QDA etc. The problem with this approach is that userId and movieId are just arbitrary variables. In fact, userId was used by Netflix to protect the privac of users. There is no cause and effect relationship between userId vs rating or movieId vs rating. In fact, if I take userId from 1 to 1000 and 1001 to 2000 and swap them, it should not affect the prediction model at all. To prove this point, let's see the correlation.
+The first temptation is to use a machine learning model on this data, like linear regression, logistic regression, LDA, QDA etc. The problem with this approach is that userId and movieId are just arbitrary variables. In fact, userId was used by Netflix to protect the privacy of users. There is no cause and effect relationship between userId vs rating or movieId vs rating. In fact, if I take userId from 1 to 1000 and 1001 to 2000 and swap them, it should not affect the prediction model at all. To prove this point, let's see the correlation.
 ```{r correlation,warning=FALSE,message=FALSE }
 cor(edx$userId,edx$rating)
 cor(edx$movieId,edx$rating)
@@ -140,8 +145,8 @@ Content based technique emphasizes more on the analysis of the attributes of ite
 [3] chapter 3 discusses an example of movie reviews either positive or negative based on 50,000 reviews from IMDB data set using deep learning. The same model can be extended to predict movie ratings from 1-5 based on reviews. As mentioned above, we don't have enough data to apply this filtering in this project.
 
 ### Collborative Filtering
-Collaborative filtering is a prediction technique for content that cannot easily adn adequately be described by metadata, such as movies and music. Collaborative filtering technique works by building a database
-(user-item matrix) of preferences for items by users. It thenmmatches users with relevant interest and preferences by calculating similarities between their profiles to make recommendations. Such users build a group called neighborhood. An user gets recommendations to those items that he has not rated before but that were already positively rated by users in his neighborhood. The technique of collaborative filtering can be divided into two categories:memory-based and model-based.
+Collaborative filtering is a prediction technique for content that cannot easily and adequately be described by metadata, such as movies and music. Collaborative filtering technique works by building a database
+(user-item matrix) of preferences for items by users. It then matches users with relevant interest and preferences by calculating similarities between their profiles to make recommendations. Such users build a group called neighborhood. An user gets recommendations to those items that he has not rated before but that were already positively rated by users in his neighborhood. The technique of collaborative filtering can be divided into two categories:memory-based and model-based.
 
 #### Memory Based Collaborative Filtering
 Memory-based CF can be achieved in two ways through user-based and item-based techniques. User based collaborative filtering technique calculates similarity between users by comparing their ratings on the same item and it then computes the predicted rating for an item by the active user as a weighted average of the ratings of the item by users similar to the active user where weights are the similarities of these users with the target item. Item-based filtering techniques compute predictions using the similarity between items and not the similarity between users.
@@ -149,31 +154,38 @@ Memory-based CF can be achieved in two ways through user-based and item-based te
 In our Solution#1 we have used memory based collaborating filtering along with regularization on top of overall average rating.
 
 #### Model Based Techniques
-Model based techniqes employ previous ratings to learn a model in order to improve the performance of collaborative filtering. These techniques can quickly recommmend a set of items for the fact that they use pre-computed model. The most popular model based techniqe in recommender system is Singular Value Decomposition (SVD). In both our Solution#1 and Solution#2 matrix factorization by SVD is used as a model based CF filtering.
+Model based techniques employ previous ratings to learn a model in order to improve the performance of collaborative filtering. These techniques can quickly recommend a set of items for the fact that they use pre-computed model. The most popular model based technique in recommended system is Singular Value Decomposition (SVD). In both our Solution#1 and Solution#2 matrix factorization by SVD is used as a model based CF filtering.
 
 # Solution#1
 
 Solution#1 is based on [1] and [2]. The model for predicted ratings have four components, calculated from edx_train
 
-*1. mu - mean of ratings
+\[Y_{u,i}= \mu + b_i + b_u + r_{u,i}+\xi_{u,i}\]
 
-*2. b_i - average rating of a movie i, with L2 regularization
+*1. $\mu$ - mean of ratings
 
-*3. b_u - average rating given by a user I, with L2 regularization
+*2. b~i~ - average rating of a movie i, with L2 regularization
 
-*4. pred - residual ratings calculated from above and then from matrix factorization
+*3. b~u~ - average rating given by a user I, with L2 regularization
 
-The first step is to calculate the first component, i.e. mu - mean of ratings
+*4. $r_{u,i}$ - residual ratings calculated from above. we can write
+
+\[pred = r_{u,i}+\xi_{u,i}= Y_{u,i}- \mu + b_i + b_u\]
+
+In our computation we shall use variable `pred` to represent the left hand side of the equation and will use matrix factorization to estimate that. `pred` represents the fact that group of users have similar rating patterns for group of movies, i.e. it is the interaction between users and movies. We shall estimate it by using singular value decomposition.L
+
+The first step is to calculate the first component, i.e. $\mu$ - mean of ratings
+
 ```{r mu, cache=TRUE,warning=FALSE,message=FALSE }
 mu<-mean(edx_train$rating)
 ```
-Next step is to calculate values of b_i and b_u using L2 regularization. We shall use equations given in [1] and [2]
+Next step is to calculate values of b~i~ and b~u~ using L2 regularization. We shall use equations given in [1] and [2]
 
-$b_i(\lambda)= \frac{1}{\lambda + n_i}\sum_{a=1}^{n_i}(Y_{a}-\mu)$ 
+\[b_i(\lambda)= \frac{1}{\lambda + n_i}\sum_{a=1}^{n_i}(Y_{a}-\mu)\] 
 
-$b_u(\lambda)= \frac{1}{\lambda + n_u}\sum_{a=1}^{n_u}(Y_{a}-\mu-b_i)$ 
+\[b_u(\lambda)= \frac{1}{\lambda + n_u}\sum_{a=1}^{n_u}(Y_{a}-\mu-b_i)\]
 
-Since b_i and b_u are function of $\lambda$, we first define an range of lambdas and then find rmses for every value in the lambdas vector.
+Since b~i~ and b~u~ are function of $\lambda$, we first define an range of lambdas and then find rmses for every value in the lambdas vector.
 ```{r cache=TRUE, warning=FALSE,message=FALSE }
 lambdas <- seq(3, 7, 0.25)
 # calculates rmses for the above values of lambdas to tune the model
@@ -202,9 +214,9 @@ at the value of lambda
 lambda<-lambdas[which.min(rmses)]
 lambda
 ```
-Now we shall calculate b_i and b_u for edx_train. Those b_i and b_u are then used to calculate predicted ratings for edx_train and edx_test. Predicted ratings for edx_test is later used along with funk svd predictions to tune the model.
+Now we shall calculate b~i~ and b~u~ for edx_train. Those b~i~ and b~u~ are then used to calculate predicted ratings for edx_train and edx_test. Predicted ratings for edx_test is later used along with funk svd predictions to tune the model.
 
-Predcited ratings for edx_train are used to calculate the residual ratings. Funk svd matrix factorization is applied on those residual edx_train ratings to build the model. 
+Predicted ratings for edx_train are used to calculate the residual ratings. Funk svd matrix factorization is applied on those residual edx_train ratings to build the model. 
 
 Here is the code:
 
@@ -236,6 +248,285 @@ edx_train<-edx_train%>%
   mutate(predicted_ratings_train=predicted_ratings_train,
          resid=rating-predicted_ratings_train)
 ```
+Now, we shall convert `resid` into a matrix, where each row will represent a user and each column will represent a movie.
+```{r eval=TRUE,cache=TRUE,message=FALSE,warning=FALSE,cache.lazy=FALSE}
+y<-edx_train %>% select(userId,movieId,resid) %>% spread(movieId,resid) %>% as.matrix()
+rownames(y)<- y[,1]
+y<-y[,-1]
+```
+## Funck SVD
+
+A really smart realization made by the guys who entered the Netflix’s competition (notably Simon Funk) was that the users’ ratings weren’t just random guesses. Raters probably follow some logic where they weight the things they like in a movie (a specific actress or a genre) against things they don’t like (long duration or bad jokes) and then come up with a score.
+
+That process can be represented by a linear formula of the following kind:
+
+\[R_{u,i}=UV^T\]
+
+Here, 
+
+U is a matrix of rows equal to number of users (or number of rows of $r_{u,i}$) and k columns
+
+V is a matrix of rows equal to number of items/movies (or number of columns of $r_{u,i}$) and k columns
+
+k is number of features we want to extract
+
+$R_{u,i}$ is a user rating matrix, with u users and i ratings.
+
+In a recommender system database, every user doesn't rate every movie, so $R_{u,i}$ is a sparse matrix, where most of the elements are unknown.
+
+U and V can be found in such a way that the square error difference between their cross product and known rating in the user-item matrix is minimum.
+
+If we consider u as a row vector of U matrix and v as a row vector of V matrix, we can write
+
+\[\text{expected rating} = \hat{r_{u,i}}=uv^T\]
+
+Our goal is to minimize the following for each known rating.
+
+\[min (u,v) \sum(r_{u,i}-uv^T)\]
+
+For our model to be able to generalize well and not over-fit the training set, we introduce a penalty term to our minimization equation. This is represented by a regularization factor ${\gamma}$ multiplied by the square sum of the magnitudes of user and item vectors, in case of L2 regularization (ridge regression)
+
+\[min (u,v) \sum(r_{u,i}-uv^T)+\gamma(||u||^2+||v||^2)\]
+
+While in case of L1 regularization, 
+
+\[min (u,v) \sum(r_{u,i}-uv^T)+\gamma(||u||+||v||)\]
+
+funkSVD is a function from `recommenderlab` library. In the funkSVD function, we use L1 regularization, where all elements of U and V matrices are set to zero initially. Following is the usage of the function with default values of arguments.
+
+funkSVD(x, k = 10, gamma = 0.015, lambda = 0.001, min_improvement = 1e-06, min_epochs = 50, max_epochs = 200, verbose = FALSE)
+
+**Arguments**
+
+Parameter         | Description
+------------------| -------------
+x                 | a matrix, potentially containing NAs.
+y                 | number of features (i.e. rank of approximation)
+gamma             | regularization term
+lambda            | learning rate
+min_improvement   | required minimum improvement per iteration
+min_epochs        | minimum number of iterations per feature
+max_epochs        | maximum number of iterations per feature
+verbos            | show progress
+
+## Tuning funkSVD model
+
+Since running funkSVD requires a lot of computational power and memory, we shall only use k = 3 features since that will give us less than the target RMSE. Using more features may definitely improve the RMSE.
+
+Besides that, there a other hyperparameters, like epochs, gamma, lambda and min_improvement. We shall keep the learning rate lambda default, however, for regularization, we shall tune our model for three values of gamma. We define a corresponding vector f_rmse and initialize it to store the RMSE outcomes of three models.
+
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+# gammas are L1 regularization terms in svd gradient descent algorithm
+# we shall calculate rmses for each of these gammas and will determine which one gives optimal tuning
+gammas<-c(0.015,0.025,0.035)
+# f_rmses stores rmses calculated for respective values of gammas
+f_rmses<-c(1,1,1)
+```
+### For gamma = 0.015
+
+As mentioned above, funkSVD function returns us two fsvd$U and fsvd$V matrices. Cross product of these two matrices gives us our prediction matrix for residuals. We add those predictions to predicted_ratings_test. Remember that
+
+\[predicted\_ratings\_test = \mu + b_i + b_u\]
+
+
+
+```{r eval=FALSE}
+###############################################################################
+# runs the Simon Funk's gradient descent algorithm to factorize matrix of residuals
+# this will take several hours
+fsvd<-funkSVD(y, k=3, gamma=gammas[1], lambda=0.001, verbose=TRUE)
+# y_hat is prediction matrix from SVD 
+y_hat_0.015<-tcrossprod(fsvd$U,fsvd$V)
+# Assigns row and column names to prediction matrix so that predicted rating can be pulled from the matrix for any user i and movie j
+rownames(y_hat_0.015)<-rownames(y)
+colnames(y_hat_0.015)<-colnames(y)
+# creates a placeholder for pred = predicted ratings for residuals from SVD
+pred<-rep(0,length(edx_test$userId))
+# fill vector pred from the prediction matrix for respective userId and movieId
+for(i in 1:length(edx_test$userId)){
+  pred[i]<-y_hat_0.015[as.character(edx_test$userId[i]),as.character(edx_test$movieId[i])]}
+# calculated predicted ratings form edx_test for that particular gamma
+predicted_ratings_0.015<-predicted_ratings_test+pred
+# calculates rmse for that particular gamma
+f_rmses[1]<-RMSE(predicted_ratings_0.015,edx_test$rating)
+#[1] 0.8260231
+```
+```{r echo=FALSE,message=FALSE,warning=FALSE}
+load("./rdas/f_rmses.rda")
+```
+The RMSE calculated for gamma=0.015 is
+```{r message=FALSE,warning=FALSE}
+f_rmses[1]
+```
+### For gamma = 0.025
+
+As mentioned above, funkSVD function returns us two fsvd$U and fsvd$V matrices. Cross product of these two matrices gives us our prediction matrix for residuals. We add those predictions to predicted_ratings_test. Remember that
+
+\[predicted\_ratings\_test = \mu + b_i + b_u\]
+
+
+
+```{r eval=FALSE}
+###############################################################################
+# runs the Simon Funk's gradient descent algorithm to factorize matrix of residuals
+fsvd<-funkSVD(y, k=3, gamma=gammas[2], lambda=0.001, verbose=TRUE)
+# y_hat is prediction matrix from SVD 
+y_hat_0.025<-tcrossprod(fsvd$U,fsvd$V)
+# Assigns row and column names to prediction matrix so that predicted rating can be pulled from the matrix for any user i and movie j
+rownames(y_hat_0.025)<-rownames(y)
+colnames(y_hat_0.025)<-colnames(y)
+pred<-rep(0,length(edx_test$userId))
+# fill vector pred from the prediction matrix for respective userId and movieId
+for(i in 1:length(edx_test$userId)){
+  pred[i]<-y_hat_0.025[as.character(edx_test$userId[i]),as.character(edx_test$movieId[i])]}
+# calculated predicted ratings form edx_test for that particular gamma
+predicted_ratings_0.025<-predicted_ratings_test+pred
+# calculates rmse for that particular gamma
+f_rmses[2]<- RMSE(predicted_ratings_0.025,edx_test$rating)
+#0.8257668
+```
+
+The RMSE calculated for gamma=0.025 is
+```{r message=FALSE,warning=FALSE}
+f_rmses[2]
+```
+### For gamma = 0.035
+
+As mentioned above, funkSVD function returns us two fsvd$U and fsvd$V matrices. Cross product of these two matrices gives us our prediction matrix for residuals. We add those predictions to predicted_ratings_test. Remember that
+
+\[predicted\_ratings\_test = \mu + b_i + b_u\]
+
+
+
+```{r eval=FALSE}
+###############################################################################
+# runs the Simon Funk's gradient descent algorithm to factorize matrix of residuals
+fsvd<-funkSVD(y, k=3, gamma=gammas[3], lambda=0.001, verbose=TRUE)
+y_hat_0.035<-tcrossprod(fsvd$U,fsvd$V)
+rownames(y_hat_0.035)<-rownames(y)
+colnames(y_hat_0.035)<-colnames(y)
+pred<-rep(0,length(edx_test$userId))
+for(i in 1:length(edx_test$userId)){
+  pred[i]<-y_hat_0.035[as.character(edx_test$userId[i]),as.character(edx_test$movieId[i])]}
+predicted_ratings_0.035<-predicted_ratings_test+pred
+f_rmses[3]<- RMSE(predicted_ratings_0.035,edx_test$rating)
+#[1] 0.8258410
+```
+
+The RMSE calculated for gamma=0.035 is
+```{r message=FALSE,warning=FALSE}
+f_rmses[3]
+```
+
+### Calculating Final RMSE for Validation
+
+After calculating RMSEs for all three values of gammas, we select the gamma which gave us lowest RMSE.
+```{r message=FALSE,warning=FALSE}
+#calculates the optimal gamma from rmses results
+gamma_min<-gammas[which.min(f_rmses)]
+gamma_min
+```
+```{r eval=FALSE}
+# assigns the final prediction matrix from the min rmse gamma
+y_hat_final<-y_hat_0.025
+```
+```{r echo=FALSE,cache=TRUE,cache.lazy=FALSE}
+rm(y)
+load("./rdas/y_hat_final.rda")
+```
+Next, we calculate predicted ratings for validation set using ${\mu}$, $b_i$ and $b_u from edx_train.
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+# predicted ratings for validation set is first calculated from mu, b_i and b_u from edx_train
+predicted_ratings_valid<-
+  validation%>%left_join(b_i,by="movieId")%>%
+  left_join(b_u,by="userId")%>%
+  mutate(pred=mu+b_i+b_u)%>%
+  pull(pred)
+```
+From here, we calculate first RMSE before applying SVD residual calculations
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+# This finds rmse before applying SVD to residual
+RMSE(validation$rating,predicted_ratings_valid)
+```
+Following code now calculates validation RMSE
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+# A residual vector placeholder for each user in the validation
+pred<-rep(0,length(validation$userId))
+# pulls the predicted value of residual from the prediction matrix 
+for(i in 1:length(validation$userId)){
+  pred[i]<-y_hat_final[as.character(validation$userId[i]),as.character(validation$movieId[i])]}
+#calculates the final predicted ratings for validation set
+predicted_ratings_valid<-predicted_ratings_valid+pred
+# calculates final rmse
+RMSE(predicted_ratings_valid,validation$rating)
+```
+
+# Solution #2
+We used gradient descent algorithm in fundSVD function for matrix factorization. The problem with this solution is that it requires a lot of computational power and cannot be be parallelized. In [2], authors presented a fast parallel SG method, FPSG, for shared memory systems. By dramatically reducing the cache-miss rate and carefully addressing the load balance of threads, FPSG is more efficient than state-of-the-art parallel algorithms for matrix factorization. R's `recosystem` package is based on this FPSG algorithm, which is much faster than funKsvd of `recommenderlab` and requires less memory. 
+
+FPSG uses the standard thread class in C++ implemented by pthread to do the parallelization. The description of C++ code is beyond the scope of this study.
+
+In the first step, we shall load the `recosystem package` and will initialize a `reco` object.
+```{r eval=FALSE}
+install.packages("recosystem")
+```
+
+```{r warning=FALSE,message=FALSE, cache=TRUE,results='hide'}
+library(recosystem)
+r<-Reco()
+```
+## Model Tuning
+
+Next, we tune the model for 5 features or 10 features #with 3 different values of learning rates (0.05,0.1,0.15)
+for 20 iterations and 5 fold cross validation. Please note that since the tune function is itself using cross validation, we are not breaking edx dataset into train and test.
+```{r eval=FALSE,message=FALSE,warning=FALSE}
+opts<-r$tune(data_memory(edx$userId,edx$movieId,rating = edx$rating,index1 = TRUE),opts = list(dim=c(5,10),lrate=c(0.05,0.1,0.15),niter=20,nfold=5,verbose=FALSE))
+
+```
+```{r echo=FALSE,warning=FALSE,message=FALSE}
+load("./rdas/opts.rda")
+```
+
+Opts$min gives us the optimized tuning parameters.
+```{r cache=TRUE,warning=FALSE,message=FALSE}
+opts$min
+```
+Tuning Parameter    |   Value
+--------------------|------------
+Features            |   opts$min$dim
+Learning rate       |   opts$min$lrate
+
+## Model Trainig
+
+Following will train edx dataset based on above tuning parameters and 100 iterations.
+
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+r$train(data_memory(edx$userId,edx$movieId,rating = edx$rating,index1 = TRUE),opts = c(opts$min,nthread=1,niter=100))
+```
+
+## Results
+
+Now we use the predict function to get predicted ratings for the validation set.
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+predicted_ratings<-r$predict(data_memory(validation$userId,validation$movieId,rating = NULL,index1 = TRUE),out_memory())
+```
+Finally the RMSE function gives the root mean square error.
+```{r cache=TRUE,message=FALSE,warning=FALSE}
+RMSE(predicted_ratings,validation$rating)
+```
+# Conclusion
+The original Netflix competition was launched in 2006 and winners were announced in 2009. Since then this topic has attracted a lot of attention and significant improvements have been made in recommender system modeling. The main issue, as discussed in our solution#1 is the heavy computational cost to handle linear algebraic operations on a huge dataset. However, we see that the computational cost was significantly reduced in solution#2 by using parallel computing.
+
+## Who won the competition?
+
+The obvious answer comes into mind is Bellkor. Following is the trend of Netflix's revenue growth over the years.
+
+![Netflix Revenue Growth]("./Images/Netflix Revenue Growth.png ")
+
+This shows that the real beneficiary of all these kind of initiatives was actually Netflix itself. The $1M price over three years of hard work divided among 7 persons doesn't look like an attractive story, compared to the the benefits Netflix reaped out of it.
+
+The practical challenge for any such recommender system is that the competition was done on a static data, whereas the in the real world recommender system has to deal with data changing all the time, i.e. always new users adding up and new movies coming in. We couldn't find how Netflix is using recommender system on realtime data and at what frequency they are retraining their models, though we have some insight from LinkedIn offline batch computing and online serving. 
+
 
 # Bibliography
 [1] Yehuda Koren. The BellKor Solution to the Netflix Grand Prize
@@ -243,3 +534,5 @@ edx_train<-edx_train%>%
 [2] Rafael A. Irizarry. Introduction to Data Science
 
 [3] François Chollet and Joseph J. Allaire. Deep Learning with R
+
+[4] WEI-SHENG CHIN, YONG ZHUANG, YU-CHIN JUAN, CHIH-JEN LIN. A Fast Parallel Stochastic Gradient Method for Matrix Factorization in Shared Memory Systems
