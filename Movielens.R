@@ -158,7 +158,7 @@ predicted_ratings_0.025<-predicted_ratings_test+pred
 f_rmses[2]<- RMSE(predicted_ratings_0.025,edx_test$rating)
 #0.8257668
 ###########################################################################
-# runs the Simon Funk's stocastic gradient descent algorithm to factorize matrix of residuals
+# runs the Simon Funk's gradient descent algorithm to factorize matrix of residuals
 fsvd<-funkSVD(y, k=3, gamma=gammas[3], lambda=0.001, verbose=TRUE)
 y_hat_0.035<-tcrossprod(fsvd$U,fsvd$V)
 rownames(y_hat_0.035)<-rownames(y)
@@ -206,6 +206,7 @@ r<-Reco()
 #with 3 different values of learning rates (0.05,0.1,0.15)
 #for 20 iterations and 5 fold cross validation
 opts<-r$tune(data_memory(edx$userId,edx$movieId,rating = edx$rating,index1 = TRUE),opts = list(dim=c(5,10),lrate=c(0.05,0.1,0.15),niter=20,nfold=5,verbose=FALSE))
+
 # opts$min gives us the optimized tuning rate
 opts$min
 # i.e. 10 features, L1 and L2 regularization factors and a
