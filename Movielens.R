@@ -5,8 +5,8 @@
 if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
 if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
 if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
-if(!require(data.table)) install.packages("Matrix", repos = "http://cran.us.r-project.org")
-if(!require(data.table)) install.packages("recommenderlab", repos = "http://cran.us.r-project.org")
+if(!require(Matrix)) install.packages("Matrix", repos = "http://cran.us.r-project.org")
+if(!require(recommenderlab)) install.packages("recommenderlab", repos = "http://cran.us.r-project.org")
 
 #tcrossprod() is used from library Matrix, while funkSVD() is used from library recommenderlab
 

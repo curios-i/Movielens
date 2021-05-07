@@ -33,11 +33,11 @@ The 10M movie rating data is downloaded from [this link](http://files.grouplens.
 
 ```{r grabbing-data,cache=TRUE,results='hide',warning=FALSE,message=FALSE}
 
-if(!require(tidyverse)) install.packages("tidyverse")
-if(!require(caret)) install.packages("caret")
-if(!require(data.table)) install.packages("data.table")
-if(!require(data.table)) install.packages("Matrix")
-if(!require(data.table)) install.packages("recommenderlab")
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(Matrix)) install.packages("Matrix", repos = "http://cran.us.r-project.org")
+if(!require(recommenderlab)) install.packages("recommenderlab", repos = "http://cran.us.r-project.org")
 
 #tcrossprod() is used from library Matrix, while 
 #funkSVD() is used from library recommenderlab
